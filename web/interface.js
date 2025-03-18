@@ -152,11 +152,8 @@ function initializePumpFunctions() {
             // This simulates the vulnerable calculation with integer overflow
             const MAX_UINT32 = 4294967295;
             
-            // First multiply rate by time (in regular JS math)
-            let intermediate = pumpState.rate_ml_per_hour * time;
-            
-            // Then multiply by 1000 (this is where overflow might happen)
-            intermediate = intermediate * 1000;
+            // Single calculation that can overflow with large values
+            let intermediate = pumpState.rate_ml_per_hour * time * 1000;
             
             // Apply 32-bit overflow if necessary
             if (intermediate > MAX_UINT32) {

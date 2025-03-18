@@ -224,7 +224,7 @@ InfusionPumpState pump_state;
 
 // Calculate how much fluid should be delivered based on elapsed time
 uint16_t calculate_volume_to_deliver(uint32_t time_increment_ms) {
-
+    // Vulnerable calculation - integer overflow with large values
     uint32_t volume_microliters = pump_state.rate_ml_per_hour * time_increment_ms * 1000 / 3600000;
     
     // Convert back to milliliters (truncating fractions)

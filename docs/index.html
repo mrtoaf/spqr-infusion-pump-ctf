@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SPQR Infusion Pump - CTF Challenge</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>SPQR Medical Infusion Pump</h1>
+            <p class="warning">WARNING: This is an educational simulation with intentional vulnerabilities</p>
+        </header>
+
+        <div class="pump-container">
+            <div class="pump-display">
+                <div class="display-section">
+                    <h2>Patient Information</h2>
+                    <div class="input-group">
+                        <label for="patient-id">Patient ID:</label>
+                        <input type="text" id="patient-id" maxlength="15" value="UNKNOWN">
+                    </div>
+                    <div class="input-group">
+                        <label for="medication">Medication:</label>
+                        <input type="text" id="medication" maxlength="31" value="SALINE">
+                    </div>
+                </div>
+
+                <div class="display-section">
+                    <h2>Infusion Settings</h2>
+                    <div class="input-group">
+                        <label for="rate">Rate (ml/hr):</label>
+                        <input type="number" id="rate" min="0" max="999" value="100">
+                        <button id="set-rate" class="btn">Set Rate</button>
+                    </div>
+                    <div class="input-group">
+                        <label for="volume">Volume (ml):</label>
+                        <input type="number" id="volume" min="0" max="1000" value="500">
+                        <button id="set-volume" class="btn">Set Volume</button>
+                    </div>
+                    <div class="input-group">
+                        <label for="duration">Duration (seconds):</label>
+                        <input type="number" id="duration" min="0" max="3600" value="5000">
+                        <button id="set-duration" class="btn">Set Duration</button>
+                    </div>
+                </div>
+
+                <div class="display-section">
+                    <h2>Status</h2>
+                    <div class="status-group">
+                        <div class="status-item">
+                            <span class="status-label">Status:</span>
+                            <span id="status-value" class="status-value">Stopped</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Elapsed Time:</span>
+                            <span id="elapsed-time" class="status-value">00:00:00</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Volume Infused:</span>
+                            <span id="volume-infused" class="status-value">0 ml</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-buttons">
+                    <button id="init-pump" class="btn">Reset Pump</button>
+                    <button id="start-infusion" class="btn btn-primary">Start Infusion</button>
+                    <button id="stop-infusion" class="btn btn-danger" disabled>Stop Infusion</button>
+                    <button id="admin-access" class="btn btn-admin">Admin Access</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="console-output">
+            <h2>Console Output</h2>
+            <div id="console" class="console"></div>
+            <div class="console-buttons">
+                <button id="clear-console" class="btn">Clear Console</button>
+                <button id="view-source" class="btn btn-info">View Decompiled Source</button>
+                <button id="gdb-tutorial" class="btn btn-tutorial">GDB Tutorial</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Access Modal -->
+    <div id="admin-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Admin Authentication</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p>Enter the admin password to access advanced features:</p>
+                <input type="password" id="admin-password" placeholder="Password">
+                <div id="password-error" class="error-message"></div>
+                <button id="login-button" class="btn btn-admin">Login</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Panel (initially hidden) -->
+    <div id="admin-panel" class="admin-panel">
+        <div class="admin-header">
+            <h2>Admin Control Panel</h2>
+            <span class="close-admin">&times;</span>
+        </div>
+        <div class="admin-content">
+            <div class="input-group">
+                <label for="admin-rate">Custom Rate (ml/hr):</label>
+                <input type="number" id="admin-rate" value="100">
+            </div>
+            <div class="input-group">
+                <label for="admin-volume">Custom Volume (ml):</label>
+                <input type="number" id="admin-volume" value="500">
+            </div>
+            <div class="input-group">
+                <label for="admin-duration">Duration (seconds):</label>
+                <input type="number" id="admin-duration" value="5000">
+            </div>
+            <div class="admin-buttons">
+                <button id="set-custom-params" class="btn btn-admin">Set Custom Parameters</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overlay for modals -->
+    <div id="overlay" class="overlay"></div>
+
+    <!-- Loading screen -->
+    <div id="loading-screen">
+        <div class="loader"></div>
+        <p>Loading Infusion Pump Firmware...</p>
+    </div>
+
+    <!-- Tutorial modal -->
+    <div id="tutorial-modal" class="modal">
+        <div class="modal-content tutorial-content">
+            <div class="modal-header">
+                <h2>SPQR Medical Infusion Pump - Tutorial</h2>
+                <span class="close" id="close-tutorial">&times;</span>
+            </div>
+            <div class="modal-body">
+                <h3>Welcome to the CTF Challenge</h3>
+                <p>This simulator represents a medical infusion pump with potential security vulnerabilities. Your goal is to explore the system and identify any security flaws that could lead to patient harm.</p>
+                
+                <h3>What is an Infusion Pump?</h3>
+                <p>Medical infusion pumps are devices that deliver fluids, such as medications or nutrients, into a patient's body in controlled amounts. They are critical medical devices where software vulnerabilities could have life-threatening consequences.</p>
+                
+                <h3>Basic Operation:</h3>
+                <ol>
+                    <li><strong>Set Patient Information:</strong> Enter patient ID and medication details</li>
+                    <li><strong>Configure Infusion Parameters:</strong>
+                        <ul>
+                            <li><strong>Rate (ml/hr):</strong> How fast the medication is delivered</li>
+                            <li><strong>Volume (ml):</strong> Total amount of fluid to be infused</li>
+                            <li><strong>Duration (seconds):</strong> How long the infusion will run</li>
+                        </ul>
+                    </li>
+                    <li><strong>Initialize:</strong> Use "Reset Pump" to prepare the device</li>
+                    <li><strong>Start Infusion:</strong> Begin medication delivery</li>
+                    <li><strong>Monitor:</strong> Watch the console for important messages</li>
+                </ol>
+                
+                <h3>Challenge Objective:</h3>
+                <p>Your mission is to identify and exploit a potentially dangerous vulnerability in this device. Look for unexpected behaviors, error messages, or ways to manipulate the system's operation.</p>
+                
+                <h3>Note:</h3>
+                <p>This is an educational simulation designed to demonstrate common security issues in medical devices. No real patients or medications are involved.</p>
+                
+                <div class="tutorial-footer">
+                    <button id="start-challenge" class="btn btn-primary">Begin Challenge</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Source Code modal -->
+    <div id="source-modal" class="modal">
+        <div class="modal-content source-content">
+            <div class="modal-header">
+                <h2>Decompiled Firmware Source Code</h2>
+                <span class="close" id="close-source">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="source-note">
+                    <p><strong>Note:</strong> This represents a reverse-engineered version of the firmware. In real scenarios, medical device manufacturers do not usually provide firmware source code, but security researchers may extract binaries and decompile them for analysis.</p>
+                    <div class="download-button-container">
+                        <a href="infusionvuln.c" download class="btn btn-download">Download C Source Code</a>
+                    </div>
+                </div>
+                <pre id="source-code" class="source-display">
+// SPQR Infusion Pump Firmware (Decompiled)
+// Model: SPQR-IPF-2025
+// Version: 1.0.3
+
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;stdint.h&gt;
+
+// Device configuration
+#define MAX_RATE_ML_PER_HOUR 1000
+#define DEFAULT_RATE_ML_PER_HOUR 100
+#define MAX_VOLUME_ML 1000
+#define DEFAULT_VOLUME_ML 500
+#define SAFETY_CHECK_INTERVAL_MS 5000
+#define ADMIN_PASSWORD "SPQR2025"  // Hard-coded admin password
+
+// Device state
+typedef struct {
+    char patient_id[16];
+    char medication[32];
+    uint16_t rate_ml_per_hour;  // Current flow rate
+    uint16_t volume_to_infuse_ml;  // Total volume to deliver
+    uint16_t volume_infused_ml;    // Current delivered volume
+    uint8_t is_running;
+    uint8_t is_admin_mode;      // Flag to indicate admin-set parameters
+    uint32_t elapsed_time_ms;    // Time since start of infusion
+} InfusionPumpState;
+
+InfusionPumpState pump_state;
+
+// Calculate how much fluid should be delivered based on elapsed time
+uint16_t calculate_volume_to_deliver(uint32_t time_increment_ms) {
+    // Vulnerable calculation - integer overflow with large values
+    uint32_t volume_microliters = pump_state.rate_ml_per_hour * time_increment_ms * 1000 / 3600000;
+    
+    // Convert back to milliliters (truncating fractions)
+    uint16_t volume_ml = (uint16_t)(volume_microliters / 1000);
+    
+    return volume_ml;
+}
+
+// Simulate the infusion process for a given time increment
+void run_infusion_cycle(uint32_t time_increment_ms) {
+    if (!pump_state.is_running) {
+        return;
+    }
+    
+    // Update elapsed time
+    pump_state.elapsed_time_ms += time_increment_ms;
+    
+    // Calculate volume to deliver during this cycle
+    uint16_t volume_to_deliver = calculate_volume_to_deliver(time_increment_ms);
+    
+    // Update the infused volume
+    pump_state.volume_infused_ml += volume_to_deliver;
+    
+    // Check if infusion is complete
+    if (pump_state.volume_infused_ml >= pump_state.volume_to_infuse_ml) {
+        pump_state.is_running = 0;
+        printf("Infusion complete! Delivered %d ml\n", pump_state.volume_infused_ml);
+    }
+}
+
+// Validate admin password
+int validate_admin_password(const char* password) {
+    if (password == NULL) return 0;
+    
+    if (strcmp(password, ADMIN_PASSWORD) == 0) {
+        printf("Admin authentication successful\n");
+        return 1;
+    } else {
+        printf("Admin authentication failed\n");
+        return 0;
+    }
+}
+
+// Special admin function to set custom parameters
+void admin_set_custom_parameters(uint16_t rate, uint32_t duration_ms) {
+    
+    // For "admin" function, bypass normal checks
+    pump_state.rate_ml_per_hour = rate;
+    
+    // Calculate how much will be delivered with these parameters
+    uint16_t calculated_volume = calculate_volume_to_deliver(duration_ms);
+    
+    // Set the volume to infuse based on the calculated value
+    pump_state.volume_to_infuse_ml = calculated_volume;
+}
+
+// Full firmware source code truncated for brevity...
+                </pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- GDB Tutorial Modal -->
+    <div id="gdb-tutorial-modal" class="modal">
+        <div class="modal-content gdb-tutorial-content">
+            <div class="modal-header">
+                <h2>Using GDB to Find the Vulnerability</h2>
+                <span class="close" id="close-gdb-tutorial">&times;</span>
+            </div>
+            <div class="modal-body">
+                <h3>Downloading and Compiling the C Source Code</h3>
+                <ol>
+                    <li>Download the source code by clicking the "Download C Source Code" button in the decompiled source view</li>
+                    <li>Open a terminal and navigate to where the file was downloaded</li>
+                    <li>Compile with debug symbols:
+                        <pre class="code-block">gcc -g infusionvuln.c -o infusionvuln</pre>
+                    </li>
+                </ol>
+
+                <h3>Basic GDB Usage</h3>
+                <ol>
+                    <li>Start GDB with the compiled program:
+                        <pre class="code-block">gdb ./infusionvuln</pre>
+                    </li>
+                    <li>Set breakpoints at key functions:
+                        <pre class="code-block">break function_name</pre>
+                    </li>
+                    <li>Run the program:
+                        <pre class="code-block">run</pre>
+                    </li>
+                    <li>When prompted by the program, explore different menu options</li>
+                    <li>If you find functionality for setting parameters, try various input values (both within normal ranges and extreme values)</li>
+                </ol>
+
+                <h3>Stepping Through the Code</h3>
+                <ol>
+                    <li>When the breakpoint is hit, examine the current context:
+                        <pre class="code-block">info args
+info locals</pre>
+                    </li>
+                    <li>Step through the function line by line:
+                        <pre class="code-block">step</pre>
+                    </li>
+                    <li>At each important calculation step, inspect relevant variables:
+                        <pre class="code-block"># Examine variables involved in calculations
+print variable_name
+
+# Evaluate expressions to understand intermediate values
+print expression1
+print expression2</pre>
+                    </li>
+                    <li>Compare actual values with what you'd expect mathematically</li>
+                    <li>Continue execution after your analysis:
+                        <pre class="code-block">continue</pre>
+                    </li>
+                </ol>
+
+                <h3>Guidelines for Security Analysis</h3>
+                <p>As you analyze the code with GDB, consider these general security questions:</p>
+                <ol>
+                    <li>Are there input validation issues in the code?</li>
+                    <li>How does the program handle numeric calculations and edge cases?</li>
+                    <li>Are there any assumptions about data types that might not hold true?</li>
+                    <li>Could unexpected values lead to safety-critical outcomes?</li>
+                    <li>How might normal operation differ from administrative or special modes?</li>
+                </ol>
+                <h3>Helpful GDB Commands</h3>
+                <pre class="code-block"># Print the value of a variable
+print variable_name
+
+# Print a value in different formats (decimal, hex, binary)
+print/d value  # decimal
+print/x value  # hexadecimal
+print/t value  # binary
+
+# Watch a variable for changes
+watch variable_name
+
+# Examine memory
+x/10w &variable_name  # Examine 10 words starting at variable address
+
+# Run a calculation directly in GDB
+print expression
+
+# Check data type and limits
+ptype type_name
+print sizeof(type_name)</pre>
+                
+                <div class="hint-box">
+                    <p><strong>Debugging Tips:</strong> When examining calculations in embedded systems, consider the limitations of various numeric data types. Watch for unexpected behavior when values approach or exceed the limits of the data type's range.</p>
+                </div>
+
+                <div class="tutorial-footer">
+                    <button id="close-gdb-tutorial-btn" class="btn btn-primary">Close Tutorial</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Interface -->
+    <script src="interface.js"></script>
+</body>
+</html>

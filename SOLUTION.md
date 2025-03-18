@@ -1,26 +1,25 @@
 # SPQR Infusion Pump CTF - Solution Guide
 
-This document provides a detailed explanation of the vulnerability in the infusion pump firmware and how to exploit it.
+This document provides the detailed solution for the SPQR Infusion Pump CTF challenge.
 
 ## Vulnerability Overview
 
-The infusion pump firmware contains an **integer overflow vulnerability** in the `calculate_volume_to_deliver` function. This vulnerability allows an attacker to cause the pump to deliver an incorrect amount of medication, which could be dangerous or fatal in a real medical device.
+The infusion pump firmware contains an **integer overflow vulnerability** in the `calculate_volume_to_deliver` function. This vulnerability allows an attacker to cause the pump to deliver a significantly lower amount of medication than intended, which could be dangerous or fatal in a real medical device.
 
 ## Technical Analysis
 
 ### Vulnerable Function
 
-The vulnerable function is `calculate_volume_to_deliver()` on line 71 of `infusionvuln.c`:
+The vulnerability is in the `calculate_volume_to_deliver()` function:
 
 ```c
-uint16_t calculate_volume_to_deliver(uint32_t time_increment_ms) {
-    // Calculate volume to deliver during this time increment (in microliters for precision)
-    // Formula: (rate_ml_per_hour * time_increment_ms) / (3600 * 1000)
-    
+// Calculate how much fluid should be delivered based on elapsed time
+double calculate_volume_to_deliver(uint32_t time_increment_ms) {
+    // Vulnerable calculation - integer overflow with large values
     uint32_t volume_microliters = pump_state.rate_ml_per_hour * time_increment_ms * 1000 / 3600000;
     
-    // Convert back to milliliters (truncating fractions)
-    uint16_t volume_ml = (uint16_t)(volume_microliters / 1000);
+    // Convert back to milliliters with decimal precision
+    double volume_ml = (double)volume_microliters / 1000.0;
     
     return volume_ml;
 }
@@ -28,95 +27,96 @@ uint16_t calculate_volume_to_deliver(uint32_t time_increment_ms) {
 
 ### The Vulnerability
 
-The vulnerability is on line 77:
+The critical vulnerability is in this line:
 
 ```c
 uint32_t volume_microliters = pump_state.rate_ml_per_hour * time_increment_ms * 1000 / 3600000;
 ```
 
-This line performs a calculation that's vulnerable to integer overflow. Let's break down what happens:
+This calculation is vulnerable to integer overflow because:
 
 1. `pump_state.rate_ml_per_hour` is a `uint16_t` (max value: 65,535)
 2. `time_increment_ms` is a `uint32_t` (max value: 4,294,967,295)
-3. The calculation multiplies these values and then multiplies by 1000
+3. The multiplication `rate * time * 1000` can easily exceed the maximum value of a `uint32_t` (4,294,967,295)
 
-If the intermediate result of `pump_state.rate_ml_per_hour * time_increment_ms * 1000` exceeds the maximum value of a `uint32_t` (4,294,967,295), an integer overflow occurs. When this happens, the result "wraps around" to a much smaller value.
+When integer overflow occurs, the result "wraps around" to a much smaller value, causing the calculation to return a significantly lower volume than intended.
 
 ### Exploitation Path
 
-The vulnerability can be exploited using the `admin_set_custom_parameters()` function, which allows setting arbitrary values for `rate` and `duration_ms` without safety checks.
+The vulnerability can only be exploited using admin access, as the normal user interface has safety limits that prevent using values large enough to trigger the overflow.
 
 ## Exploitation Steps
 
-1. First, access the admin panel by:
-   - Looking at the source code to find the hard-coded password: `MedSecure2023`
-   - Selecting option 7 (Admin Access) and entering this password
+1. First, access the admin panel:
+   - Find the hard-coded password in the source code: `SPQR2025`
+   - In the web interface: Click "Admin Access" and enter the password
+   - In the command-line: Select option 6 for Admin Access and enter the password
 
-2. Next, find values that will cause the intermediate calculation to exceed 2^32 (4,294,967,296):
-   - In the admin menu, select option 1 (Set Custom Parameters)
-   - Set `rate = 1000` (the maximum allowed rate)
-   - Set `duration_ms = 4294968` (just over 4,294,967, enough to cause overflow)
+2. Trigger the vulnerability:
+   - Set `rate = 2500` ml/hr (a high but plausible medical value)
+   - Set `duration = 3000000` milliseconds (50 minutes, again plausible)
 
-3. Then run the simulation with these values:
-   - In the admin menu, select option 2 (Run Full Simulation)
-   - Enter the same duration value (4294968)
+3. Start the infusion:
+   - In the web interface: Click "Start Infusion"
+   - In the command-line: Select option 4 to start the infusion
 
 4. Observe the results:
-   - The calculation shows: 1000 * 4294968 * 1000 = 4,294,968,000,000 (which exceeds 2^32)
-   - Expected delivery: approximately 1193 ml
-   - Actual delivery: 0 ml (due to integer overflow)
+   - The calculation `2500 * 3000000 * 1000 = 7,500,000,000,000` exceeds 2^32
+   - Expected delivery (correct math): 2083.33 ml
+   - Actual delivery: ~465.66 ml (due to integer overflow)
+   - This represents a severe underdose of approximately 77%
 
 ## Real-World Impact
 
-In a real infusion pump:
+In a real medical scenario:
 
-1. **Underdosing scenario**: The pump would appear to be working correctly, but the patient would receive little or no medication. For critical medications (insulin, pain medication, antibiotics), this could lead to:
-   - Disease progression
-   - Uncontrolled pain
-   - Medical complications
-   - Death (in severe cases)
+1. **Critical Medication Underdosing**: 
+   - For medications like antibiotics, chemotherapy, or critical care drugs, receiving only 22% of the prescribed dose could be life-threatening
+   - Patient's condition would deteriorate despite the pump appearing to function correctly
+   - The underdosing would be difficult to detect without independent verification
 
-2. **Overdosing scenario**: If a different overflow pattern occurs, the patient could receive a massive overdose. This could lead to:
-   - Toxicity
-   - Organ damage
-   - Death
+2. **Medical Consequences**:
+   - Infections would progress despite antibiotic therapy
+   - Pain would remain uncontrolled
+   - Critical conditions would deteriorate
+   - In severe cases, this could lead to death
 
-## Answer Key
+## Solution for CTF Questions
 
-1. **Which function contains the vulnerability?**
-   - `calculate_volume_to_deliver`
+### Easy Questions
+1. **What medical device is being simulated?** Infusion pump
+2. **What programming language is used?** C (and JavaScript for web version)
+3. **What special access is required?** Admin access
+4. **What is the admin password?** SPQR2025
 
-2. **What specific line(s) of code is vulnerable?**
-   - Line 77: `uint32_t volume_microliters = pump_state.rate_ml_per_hour * time_increment_ms * 1000 / 3600000;`
+### Medium Questions
+1. **Default infusion rate?** 100 ml/hr
+2. **Maximum normal rate?** 999 ml/hr or 1000 ml/hr
+3. **Data type for infusion rate?** uint16_t
+4. **Function calculating delivery volume?** calculate_volume_to_deliver()
 
-3. **What values of `rate` and `duration_ms` would you use to exploit this vulnerability?**
-   - Rate: 1000 ml/hr
-   - Duration: 4294968 ms
+### Hard Questions
+1. **Vulnerability type?** Integer overflow
+2. **Vulnerable calculation?** `rate * time * 1000` in calculate_volume_to_deliver()
+3. **Exploit values:** rate = 2500 ml/hr, duration = 3000000 ms (50 minutes)
+4. **Impact?** Severe underdosing (only ~22% of intended medication delivered)
 
-4. **How many milliliters would actually be delivered with your exploit values vs. how many are expected?**
-   - Expected: ~1193 ml
-   - Actually delivered: ~0 ml (may vary slightly depending on exact overflow)
-
-5. **In a real-world scenario, what could be the potential impact of this vulnerability to patient safety?**
-   - Patients could receive virtually no medication when they should be receiving critical medications, leading to untreated conditions, medical complications, or death
-   - In other overflow scenarios, patients could receive massive overdoses, leading to toxicity and death
-
-## Flag
-
-Using the exploit values:
-
-`flag{1000}_{4294968}_{0}`
+### Expert Question
+1. **Optimal exploit values:** rate = 2500, duration = 3000000
+2. **Expected volume:** 2083.33 ml
+3. **Actual volume:** 465.66 ml
+4. **Discrepancy:** 1617.67 ml (77.7% less medication)
 
 ## Mitigation
 
 To fix this vulnerability:
 
-1. Use large enough data types to prevent overflow:
+1. Use larger data types to prevent overflow:
 ```c
 uint64_t volume_microliters = (uint64_t)pump_state.rate_ml_per_hour * time_increment_ms * 1000 / 3600000;
 ```
 
-2. Add bounds checking before performing the calculation:
+2. Add bounds checking:
 ```c
 if ((uint64_t)pump_state.rate_ml_per_hour * time_increment_ms * 1000 > UINT32_MAX) {
     // Handle overflow condition
@@ -125,4 +125,4 @@ if ((uint64_t)pump_state.rate_ml_per_hour * time_increment_ms * 1000 > UINT32_MA
 }
 ```
 
-3. Implement redundant safety checks to validate calculated values against expected ranges.
+3. Implement redundant safety checks for critical calculations.

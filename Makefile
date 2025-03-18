@@ -1,21 +1,15 @@
 CC = gcc
-CFLAGS = -Wall -Wextra
+CFLAGS = -Wall -Wextra -lm
 
-all: infusion_pump test_overflow
+all: infusion_pump
 
 infusion_pump: infusionvuln.c
 	$(CC) $(CFLAGS) -o $@ $<
-
-test_overflow: test_overflow.c
-	$(CC) $(CFLAGS) -o $@ $<
-
-test: test_overflow
-	./test_overflow
 
 run: infusion_pump
 	./infusion_pump
 
 clean:
-	rm -f infusion_pump test_overflow
+	rm -f infusion_pump
 
-.PHONY: all clean test run
+.PHONY: all clean run
